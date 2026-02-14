@@ -1,4 +1,22 @@
-node_modules
-.next
+# Dependencies
+node_modules/
+
+# Next.js build files
+.next/
+out/
+dist/
+
+# Environment variables
 .env
-uploads
+.env.local
+.env.*
+
+# Uploads (local storage)
+uploads/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
