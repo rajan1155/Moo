@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, type Variants, type Transition } from "framer-motion";
 import { Heart, Image, Mic, MailOpen, Sparkles as SparkleIcon } from "lucide-react";
 
 export default function Home() {
@@ -56,16 +56,18 @@ export default function Home() {
     }
   };
 
-  const item = {
-    hidden: { opacity: 0, y: 20 },
+  const spring: Transition = {
+    type: "spring",
+    stiffness: 260,
+    damping: 20,
+  };
+
+  const item: Variants = {
+    hidden: { opacity: 0, y: 12 },
     show: { 
       opacity: 1, 
       y: 0, 
-      transition: { 
-        type: "spring", 
-        stiffness: 50,
-        damping: 15
-      } 
+      transition: spring 
     }
   };
 

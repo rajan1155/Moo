@@ -133,12 +133,12 @@ export default function ValentinePage() {
                     left: `${Math.random() * 100}%`,
                     opacity: 1,
                     scale: Math.random() * 0.5 + 0.5,
-                    rotation: Math.random() * 360
+                    rotate: Math.random() * 360
                   }}
                   animate={{ 
                     top: "-10%",
                     opacity: 0,
-                    rotation: Math.random() * 360 + 360
+                    rotate: Math.random() * 360 + 360
                   }}
                   transition={{ 
                     duration: Math.random() * 4 + 2,

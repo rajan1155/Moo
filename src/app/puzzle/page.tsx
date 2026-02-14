@@ -33,7 +33,7 @@ export default function PuzzlePage() {
         if (config.url) {
           // Add version parameter to force reload if changed
           setPuzzleImage(`${config.url}?v=${config.updatedAt}`);
-          setTiles([...Array(SIZE * SIZE).keys()].sort(() => Math.random() - 0.5));
+          setTiles(Array.from({ length: SIZE * SIZE }, (_, i) => i).sort(() => Math.random() - 0.5));
         } else {
           setPuzzleImage(null);
         }
