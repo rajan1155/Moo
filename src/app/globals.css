@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Palette Source of Truth */
+  --bg1: #E6E6FA; /* Lavender */
+  --bg2: #F8BBD0; /* Blush Pink */
+  --accent: #EC407A; /* Rose Pink */
+  --accent-light: #FCE4EC; /* Light Rose */
+  --text: #2E1F47; /* Deep Plum */
+  --text-soft: #5C4B75; /* Softer Plum */
+  --card-bg: rgba(255, 255, 255, 0.55);
+  --card-border: rgba(230, 230, 250, 0.5);
+  
+  /* Helper colors for gradients */
+  --grad-start: #E6E6FA;
+  --grad-end: #F8BBD0;
+}
+
+body {
+  color: var(--text);
+  background: linear-gradient(135deg, var(--bg1) 0%, var(--bg2) 100%);
+  background-attachment: fixed; /* Ensure gradient covers full viewport scroll */
+  min-height: 100vh;
+  font-family: var(--font-inter), sans-serif;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), serif;
+  color: var(--text);
+}
+
+/* Floating Hearts Animation */
+@keyframes float {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  20% { opacity: 0.2; }
+  50% { opacity: 0.3; }
+  80% { opacity: 0.2; }
+  100% { transform: translateY(-100vh) rotate(360deg); opacity: 0; }
+}
+
+.floating-heart {
+  position: fixed;
+  bottom: -10%;
+  color: var(--accent);
+  opacity: 0;
+  animation: float 15s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.floating-heart:nth-child(1) { left: 10%; animation-duration: 12s; animation-delay: 0s; font-size: 2rem; }
+.floating-heart:nth-child(2) { left: 20%; animation-duration: 15s; animation-delay: 2s; font-size: 1.5rem; }
+.floating-heart:nth-child(3) { left: 35%; animation-duration: 10s; animation-delay: 4s; font-size: 2.5rem; }
+.floating-heart:nth-child(4) { left: 50%; animation-duration: 18s; animation-delay: 1s; font-size: 1.8rem; }
+.floating-heart:nth-child(5) { left: 65%; animation-duration: 14s; animation-delay: 3s; font-size: 2.2rem; }
+.floating-heart:nth-child(6) { left: 80%; animation-duration: 16s; animation-delay: 5s; font-size: 1.6rem; }
+.floating-heart:nth-child(7) { left: 90%; animation-duration: 13s; animation-delay: 2s; font-size: 2rem; }
+
+/* Frosted Glass Utility */
+.glass-card {
+  background: var(--card-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 32px 0 rgba(46, 31, 71, 0.05);
+}
+
+.glass-card-hover:hover {
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateY(-5px);
+  box-shadow: 0 12px 40px 0 rgba(236, 64, 122, 0.15);
+  border-color: var(--bg2);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg1); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
