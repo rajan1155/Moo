@@ -47,13 +47,14 @@ export default function AdminPage() {
   async function handleDelete(type: 'memory' | 'voice', id: string) {
     if (!confirm('Are you sure you want to delete this? This cannot be undone.')) return;
     
-    const endpoint = type === 'memory' ? `/api/memories/${id}` : `/api/voice-notes/${id}`;
+    const safeId = encodeURIComponent(id);
+    const endpoint = type === 'memory' ? `/api/memories/${safeId}` : `/api/voice-notes/${safeId}`;
     
     try {
       const res = await fetch(endpoint, { method: 'DELETE' });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       
-      if (data.ok) {
+      if (res.ok && data?.ok) {
         setMessage({ text: 'Deleted successfully! 🗑️', type: 'success' });
         if (type === 'memory') {
           setMemories(prev => prev.filter(m => m.id !== id));
@@ -61,7 +62,7 @@ export default function AdminPage() {
           setVoiceNotes(prev => prev.filter(v => v.id !== id));
         }
       } else {
-        setMessage({ text: data.error || 'Delete failed', type: 'error' });
+        setMessage({ text: data.error || (res.status === 404 ? 'Delete API route not found' : 'Delete failed'), type: 'error' });
       }
     } catch (error) {
       setMessage({ text: 'Network error', type: 'error' });
@@ -88,6 +89,22 @@ export default function AdminPage() {
           url: data.url,
           updatedAt: data.updatedAt
         });
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          console.log('Admin saved puzzle image', data.url);
+        }
+        // Re-fetch from persisted source to ensure freshness
+        try {
+          const latest = await fetch('/api/puzzle-config', { cache: 'no-store' });
+          if (latest.ok) {
+            const cfg = await latest.json();
+            setPuzzleConfig(cfg);
+            if (process.env.NODE_ENV !== 'production') {
+              // eslint-disable-next-line no-console
+              console.log('Admin loaded puzzle image', cfg.url);
+            }
+          }
+        } catch {}
       } else {
         setMessage({ text: data.error || 'Upload failed', type: 'error' });
       }

@@ -37,6 +37,9 @@ export const updatePuzzleImage = async (file: File) => {
 
 // --- Letters ---
 export const getLetter = async (mood: string): Promise<Letter | null> => {
+  if (!db) {
+    throw new Error("Firebase not configured");
+  }
   const snap = await getDoc(doc(db, "letters", mood));
   if (snap.exists()) return { id: snap.id, ...snap.data() } as Letter;
   return null;

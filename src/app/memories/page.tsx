@@ -14,12 +14,33 @@ interface Memory {
 export default function MemoriesPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const getThumbUrl = (url: string) => {
+    const marker = '/image/upload/';
+    const idx = url.indexOf(marker);
+    if (idx === -1) return url;
+    const before = url.slice(0, idx + marker.length);
+    const after = url.slice(idx + marker.length);
+    return `${before}f_auto,q_auto,c_limit,w_600/${after}`;
+  };
 
   useEffect(() => {
-    fetch('/api/list/memories')
+    fetch('/api/list/memories', { cache: 'no-store' })
       .then(res => res.json())
-      .then(data => setMemories(data))
-      .catch(console.error);
+      .then(data => {
+        setMemories(data);
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          requestAnimationFrame(() => {
+            // timing removed
+          });
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
 
   return (
@@ -41,10 +62,10 @@ export default function MemoriesPage() {
           <p className="text-[var(--text-soft)] font-medium italic">Moments frozen in time 📸</p>
         </header>
 
-        {memories.length === 0 ? (
-          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">
-            No memories uploaded yet. Check back later!
-          </div>
+        {loading ? (
+          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">Loading...</div>
+        ) : memories.length === 0 ? (
+          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">No memories uploaded yet. Check back later!</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {memories.map((mem, idx) => (
@@ -58,7 +79,7 @@ export default function MemoriesPage() {
               >
                 <div className="aspect-[4/3] glass-card p-3 rounded-[24px] hover:shadow-[0_10px_30px_-10px_rgba(236,64,122,0.3)] hover:scale-[1.03] transition-all duration-300 cursor-zoom-in overflow-hidden relative">
                   <img 
-                    src={mem.url} 
+                    src={getThumbUrl(mem.url)} 
                     alt="Memory" 
                     className="w-full h-full object-cover rounded-2xl"
                     loading="lazy"

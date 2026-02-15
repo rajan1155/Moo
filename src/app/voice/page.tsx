@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { Music, Play, Pause } from 'lucide-react';
@@ -13,13 +13,59 @@ interface VoiceNote {
 
 export default function VoicePage() {
   const [voices, setVoices] = useState<VoiceNote[]>([]);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastPausedIdRef = useRef<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const getDisplayNameFromVoiceKey = (input: string) => {
+    const base = input.split('/').pop() || input;
+    const withoutTimestamp = base.replace(/^\d{6,}-/, '');
+    const readable = withoutTimestamp.replace(/[_-]+/g, ' ');
+    return readable;
+  };
 
   useEffect(() => {
-    fetch('/api/list/voices')
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.time('voices:client');
+    }
+    fetch('/api/list/voices', { cache: 'no-store' })
       .then(res => res.json())
-      .then(data => setVoices(data))
-      .catch(console.error);
+      .then(data => {
+        setVoices(data);
+        if (process.env.NODE_ENV !== 'production') {
+          // eslint-disable-next-line no-console
+          requestAnimationFrame(() => {
+            console.timeEnd('voices:client');
+          });
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
   }, []);
+
+  const handlePlay = (id: string, e: React.SyntheticEvent<HTMLAudioElement>) => {
+    const audio = e.currentTarget;
+    if (currentAudioRef.current && currentAudioRef.current !== audio) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current.currentTime = 0;
+    }
+    currentAudioRef.current = audio;
+  };
+
+  const handlePause = (id: string) => {
+    lastPausedIdRef.current = id;
+  };
+
+  const handleEnded = (e: React.SyntheticEvent<HTMLAudioElement>) => {
+    if (currentAudioRef.current === e.currentTarget) {
+      currentAudioRef.current = null;
+    }
+    lastPausedIdRef.current = null;
+  };
 
   return (
     <div className="min-h-screen p-6">
@@ -40,10 +86,10 @@ export default function VoicePage() {
           <p className="text-[var(--text-soft)] font-medium italic">Listen to my heart beat 🎤</p>
         </header>
 
-        {voices.length === 0 ? (
-          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">
-            No voice notes yet. Quiet as a mouse! 🐭
-          </div>
+        {loading ? (
+          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">Loading...</div>
+        ) : voices.length === 0 ? (
+          <div className="text-center text-[var(--text-soft)] mt-20 italic font-serif text-lg">No voice notes yet.</div>
         ) : (
           <div className="space-y-5">
             {voices.map((voice, idx) => (
@@ -58,9 +104,17 @@ export default function VoicePage() {
                   <Play size={22} fill="currentColor" className="ml-0.5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-[var(--text)] font-semibold truncate text-lg font-serif mb-1">{voice.title || 'Voice Note'}</h3>
+                  <h3 className="text-[var(--text)] font-semibold truncate text-lg font-serif mb-1">
+                    {getDisplayNameFromVoiceKey(voice.title || voice.url) || 'Voice Note'}
+                  </h3>
                   <div className="w-full bg-[var(--bg1)] rounded-full p-1">
-                    <audio controls className="w-full h-8 opacity-80 hover:opacity-100 transition-opacity accent-[var(--accent)]">
+                    <audio
+                      controls
+                      className="w-full h-8 opacity-80 hover:opacity-100 transition-opacity accent-[var(--accent)]"
+                      onPlay={(e) => handlePlay(voice.url, e)}
+                      onPause={() => handlePause(voice.url)}
+                      onEnded={handleEnded}
+                    >
                       <source src={voice.url} />
                       Your browser does not support the audio element.
                     </audio>

@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 
-const GRID_SIZE = 3;
+// Changed GRID_SIZE from 3 to 2 to make it easier as requested
+// "Make the puzzle easier for users (fewer pieces visible on screen at once)"
+const GRID_SIZE = 2;
 const SIZE = GRID_SIZE;
 
 export default function PuzzlePage() {
@@ -15,16 +17,10 @@ export default function PuzzlePage() {
   const [puzzleImage, setPuzzleImage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check for image and cookie on initialize
+  // Initialize
   useEffect(() => {
-    // Client-side guard: if already unlocked, go home
-    // const isUnlocked = document.cookie.split(';').some((item) => item.trim() === 'valentine_unlocked=1');
-    // if (isUnlocked) {
-    //   router.replace('/');
-    //   return;
-    // }
-
-    fetch('/api/puzzle-config', { cache: 'no-store' })
+    // Add cache buster to the fetch URL itself
+    fetch(`/api/puzzle-config?t=${Date.now()}`, { cache: 'no-store' })
       .then(res => {
         if (!res.ok) throw new Error('No config');
         return res.json();
@@ -68,13 +64,18 @@ export default function PuzzlePage() {
     const won = currentTiles.every((val, idx) => val === idx);
     if (won) {
       setIsSolved(true);
-      
-      // Set unlocked cookie
-      // path=/; max-age=86400 (1 day in seconds)
-      document.cookie = "valentine_unlocked=1; path=/; max-age=86400";
-      
-      setTimeout(() => router.push('/'), 1500);
+      console.log("Puzzle solved: setting cookie");
+      document.cookie = "puzzle_unlocked=true; path=/; max-age=86400; SameSite=Lax";
+      console.log("Cookie set, redirecting to home");
+      window.location.assign("/");
+      return;
     }
+  };
+
+  const handleReset = () => {
+    if (isSolved) return;
+    // Reshuffle pieces
+    setTiles(Array.from({ length: SIZE * SIZE }, (_, i) => i).sort(() => Math.random() - 0.5));
   };
 
   if (loading) {
@@ -96,8 +97,13 @@ export default function PuzzlePage() {
     );
   }
 
+  // Calculate container size
+  // Increased size for better visibility
+  const containerSize = 400; 
+  const tileSize = containerSize / SIZE;
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden p-4">
       {/* Background with blur */}
       <div 
         className="absolute inset-0 z-0 opacity-20 bg-cover bg-center blur-sm"
@@ -112,12 +118,28 @@ export default function PuzzlePage() {
         pudu 
       </Link>
 
-      <div className="z-10 glass-card p-8 rounded-[32px] shadow-xl backdrop-blur-xl border border-white/60">
-        <h1 className="text-3xl font-bold text-center text-[var(--text)] mb-6 font-serif">
+      <div className="z-10 glass-card p-6 md:p-8 rounded-[32px] shadow-xl backdrop-blur-xl border border-white/60 flex flex-col items-center max-w-[95vw]">
+        <h1 className="text-3xl font-bold text-center text-[var(--text)] mb-2 font-serif">
           {isSolved ? "Unlocked! 🔓" : "Unlock My Heart 🔐"}
         </h1>
+        
+        <p className="text-center text-[var(--accent)] mb-6 text-sm font-medium font-serif italic">
+          {isSolved ? "Redirecting..." : "Tap the pieces to slide them into place"}
+        </p>
 
-        <div className="relative w-[300px] h-[300px] bg-[var(--bg1)] rounded-xl overflow-hidden shadow-inner border-4 border-white/50 mx-auto">
+        <div 
+          className="relative bg-[var(--bg1)] rounded-xl overflow-hidden shadow-inner border-4 border-white/50 mx-auto"
+          style={{ width: containerSize, height: containerSize, maxWidth: '100%' }}
+        >
+          {/* Soft Grid Background */}
+          <div 
+            className="absolute inset-0 pointer-events-none z-0 opacity-10" 
+            style={{ 
+              backgroundImage: `linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)`,
+              backgroundSize: `${tileSize}px ${tileSize}px`
+            }}
+          />
+
           {tiles.map((tileNumber, index) => {
             if (tileNumber === SIZE * SIZE - 1 && !isSolved) return null; // Empty tile
 
@@ -135,12 +157,14 @@ export default function PuzzlePage() {
                 key={tileNumber}
                 layout
                 onClick={() => moveTile(index)}
-                className="absolute w-[100px] h-[100px] cursor-pointer border border-white/40 shadow-sm hover:brightness-110 transition-all"
+                className="absolute cursor-pointer border border-white/40 shadow-sm hover:brightness-110 transition-all hover:scale-[1.02] active:scale-95"
                 style={{
-                  top: row * 100,
-                  left: col * 100,
+                  width: `${100/SIZE}%`,
+                  height: `${100/SIZE}%`,
+                  top: `${row * (100/SIZE)}%`,
+                  left: `${col * (100/SIZE)}%`,
                   backgroundImage: `url(${puzzleImage})`,
-                  backgroundSize: '300px 300px',
+                  backgroundSize: `${containerSize}px ${containerSize}px`,
                   backgroundPosition: `${bgX}% ${bgY}%`
                 }}
                 initial={false}
@@ -149,9 +173,16 @@ export default function PuzzlePage() {
           })}
         </div>
         
-        <p className="text-center text-[var(--accent)] mt-4 text-sm font-medium font-serif italic">
-          {isSolved ? "Redirecting..." : "Solve the puzzle to enter!"}
-        </p>
+        {!isSolved && (
+          <div className="mt-6 flex gap-4">
+             <button 
+              onClick={handleReset}
+              className="px-6 py-2 rounded-full bg-white/40 hover:bg-white/60 text-[var(--text)] font-medium text-sm transition-all border border-white/40 shadow-sm"
+            >
+              Reset Pieces
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

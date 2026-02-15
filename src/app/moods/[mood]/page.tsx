@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { getLetter } from "@/lib/db";
+import { isFirebaseConfigured } from "@/lib/firebase";
 import { Letter } from "@/lib/types";
 import { motion } from "framer-motion";
 
@@ -60,15 +61,15 @@ export default function MoodLetterPage() {
       if (!moodKey) return;
 
       try {
-        // Create a timeout promise that rejects after 2 seconds
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error("Timeout")), 2000)
-        );
-
-        const fetchPromise = getLetter(moodKey);
-
-        // Race them
-        const data = await Promise.race([fetchPromise, timeoutPromise]) as Letter | null;
+        // If Firebase is not configured (placeholders), skip remote fetch and use fallback immediately
+        if (!isFirebaseConfigured) {
+          if (mounted) {
+            setLetter(DEFAULT_LETTERS[moodKey] || DEFAULT_LETTERS["happy"]);
+          }
+          return;
+        }
+        // Fetch normally (no artificial timeout); fall back on error
+        const data = await getLetter(moodKey);
         
         if (mounted) {
           if (data) {
@@ -80,10 +81,11 @@ export default function MoodLetterPage() {
           }
         }
       } catch (err: any) {
-        console.error("Error fetching letter:", err);
+        if (process.env.NODE_ENV !== "production") {
+          console.error("Error fetching letter:", err);
+        }
         if (mounted) {
-          setError(err.message || "Failed to load");
-          // Fallback on error/timeout too
+          setError(err?.message || "Failed to load");
           setLetter(DEFAULT_LETTERS[moodKey] || DEFAULT_LETTERS["happy"]);
         }
       } finally {
@@ -103,7 +105,7 @@ export default function MoodLetterPage() {
         ← Back
       </Link>
 
-      {error && (
+      {process.env.NEXT_PUBLIC_DEBUG === "true" && error && (
         <div className="absolute top-6 right-6 text-xs text-red-400 bg-red-50 px-2 py-1 rounded border border-red-100">
           Debug: {error} (Using fallback)
         </div>

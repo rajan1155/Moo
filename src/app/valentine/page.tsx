@@ -4,12 +4,18 @@ import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { Heart } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const MAX_NO = 10;
 
 export default function ValentinePage() {
   const [noClicks, setNoClicks] = useState(0);
   const [accepted, setAccepted] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [heartPositions, setHeartPositions] = useState<
+    { top: number; left: number; opacity: number; scale: number; size: number; duration: number }[]
+  >([]);
+  const router = useRouter();
 
   // Lock scroll on this page
   useEffect(() => {
@@ -21,6 +27,19 @@ export default function ValentinePage() {
       document.documentElement.style.overflow = prevHtml;
       document.body.style.overflow = prevBody;
     };
+  }, []);
+
+  useEffect(() => {
+    setMounted(true);
+    const positions = Array.from({ length: 15 }).map(() => ({
+      top: Math.random() * 100,
+      left: Math.random() * 100,
+      opacity: 0.2,
+      scale: Math.random() * 0.5 + 0.5,
+      size: Math.random() * 40 + 20,
+      duration: Math.random() * 3 + 2,
+    }));
+    setHeartPositions(positions);
   }, []);
 
   const tease = useMemo(
@@ -59,29 +78,30 @@ export default function ValentinePage() {
       
       {/* Floating background hearts */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {Array.from({ length: 15 }).map((_, i) => (
-          <motion.div
-            key={i}
-            initial={{ 
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              opacity: 0.2,
-              scale: Math.random() * 0.5 + 0.5,
-            }}
-            animate={{ 
-              y: [0, -20, 0],
-              opacity: [0.2, 0.4, 0.2],
-            }}
-            transition={{ 
-              duration: Math.random() * 3 + 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="absolute text-[var(--bg2)]"
-          >
-            <Heart fill="currentColor" size={Math.random() * 40 + 20} />
-          </motion.div>
-        ))}
+        {mounted &&
+          heartPositions.map((h, i) => (
+            <motion.div
+              key={i}
+              initial={{
+                top: `${h.top}%`,
+                left: `${h.left}%`,
+                opacity: h.opacity,
+                scale: h.scale,
+              }}
+              animate={{
+                y: [0, -20, 0],
+                opacity: [h.opacity, Math.min(h.opacity + 0.2, 0.8), h.opacity],
+              }}
+              transition={{
+                duration: h.duration,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="absolute text-[var(--bg2)]"
+            >
+              <Heart fill="currentColor" size={h.size} />
+            </motion.div>
+          ))}
       </div>
 
       {/* Back button (only visible before accepted/final) */}
@@ -99,29 +119,29 @@ export default function ValentinePage() {
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex flex-col items-center gap-6 z-[9999] relative w-full h-full justify-center p-4 fixed inset-0 glass-card"
+            onClick={() => router.push("/")}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") router.push("/");
+            }}
           >
             <motion.div
               animate={{ scale: [1, 1.1, 1] }}
               transition={{ repeat: Infinity, duration: 2 }}
             >
-              <Heart size={120} fill="var(--accent)" className="text-[var(--accent)] drop-shadow-lg" />
+              <Heart size={120} fill="var(--accent)" className="text-[var(--accent)] drop-shadow-xl" />
             </motion.div>
             
-            <h1 className="text-4xl md:text-6xl font-bold text-[var(--text)] font-serif leading-tight drop-shadow-sm">
+            <motion.h1
+              className="text-4xl md:text-6xl font-bold text-[var(--text)] font-serif leading-tight drop-shadow-md"
+              animate={{ y: [0, -5, 0] }}
+              transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
+            >
               Happy Valentine’s Day,<br />my cutie! 💖
-            </h1>
+            </motion.h1>
             
             <p className="text-[var(--accent)] text-xl font-medium font-serif italic">I knew you'd say yes! ❤️</p>
-            
-            <Link href="/">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="mt-8 px-8 py-3 bg-white text-[var(--accent)] rounded-full font-bold shadow-lg hover:shadow-xl hover:bg-pink-50 transition-all border border-pink-100"
-              >
-                Back Home
-              </motion.button>
-            </Link>
             
             {/* Confetti */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">

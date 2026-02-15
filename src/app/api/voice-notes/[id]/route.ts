@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readFile, writeFile, unlink } from 'fs/promises';
-import path from 'path';
+import cloudinary from '@/lib/cloudinary';
 
 export async function DELETE(
   request: Request,
@@ -8,41 +7,23 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('DELETE HIT /api/voice-notes/[id]', id);
+    }
     
     if (!id) {
       return NextResponse.json({ ok: false, error: 'Missing ID' }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), 'uploads', 'voices');
-    const indexPath = path.join(uploadDir, 'index.json');
-    const filePath = path.join(uploadDir, id);
-
-    // 1. Update index.json
-    let index = [];
-    try {
-      const data = await readFile(indexPath, 'utf-8');
-      index = JSON.parse(data);
-    } catch (e) {
-      return NextResponse.json({ ok: false, error: 'Index not found' }, { status: 404 });
+    // Delete Cloudinary resource by public_id (audio uses resource_type 'video')
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('Deleting voice note from Cloudinary', { public_id: id, resource_type: 'video' });
     }
-
-    // Filter out
-    const newIndex = index.filter((item: any) => {
-        const itemId = item.url.split('/').pop();
-        return itemId !== id;
-    });
-
-    if (newIndex.length === index.length) {
-       return NextResponse.json({ ok: false, error: 'Item not found' }, { status: 404 });
-    }
-
-    await writeFile(indexPath, JSON.stringify(newIndex, null, 2));
-
-    // 2. Delete the file
-    try {
-      await unlink(filePath);
-    } catch (e) {
-      console.warn('File deletion failed:', e);
+    const destroyRes = await cloudinary.uploader.destroy(id, { resource_type: 'video' });
+    if (destroyRes.result !== 'ok' && destroyRes.result !== 'not found') {
+      return NextResponse.json({ ok: false, error: 'Delete failed' }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });

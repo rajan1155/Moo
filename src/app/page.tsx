@@ -13,7 +13,7 @@ export default function Home() {
 
   // Client Guard
   useEffect(() => {
-    const hasCookie = document.cookie.split(';').some((item) => item.trim() === 'valentine_unlocked=1');
+    const hasCookie = document.cookie.includes('puzzle_unlocked=true');
     
     if (!hasCookie) {
       router.replace("/puzzle");

@@ -1,25 +1,30 @@
 import { NextResponse } from 'next/server';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import cloudinary from '@/lib/cloudinary';
 import path from 'path';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const indexPath = path.join(process.cwd(), 'uploads', 'voices', 'index.json');
-    const data = await readFile(indexPath, 'utf-8');
-    let voices = JSON.parse(data);
-    
-    // Sort by newest first
-    voices.sort((a: any, b: any) => b.createdAt - a.createdAt);
-
-    // Add ID
-    const voicesWithId = voices.map((v: any) => ({
-      ...v,
-      id: v.url.split('/').pop()
+    const result = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'voices/',
+      resource_type: 'video',
+      max_results: 500,
+      sort_by: 'created_at',
+      direction: 'desc',
+      context: true,
+    });
+    const voices = result.resources.map((r: any) => ({
+      id: r.public_id,
+      url: r.secure_url,
+      title: r.context?.custom?.title || path.parse(r.public_id).name,
+      createdAt: new Date(r.created_at).getTime(),
     }));
-
-    return NextResponse.json(voicesWithId);
+    return NextResponse.json(voices, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
-    return NextResponse.json([]);
+    console.error('Voices GET error:', error);
+    return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
@@ -36,38 +41,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Invalid file type. Must be audio.' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), 'uploads', 'voices');
-    await mkdir(uploadDir, { recursive: true });
-
     const timestamp = Date.now();
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-    const filename = `${timestamp}-${safeName}`;
-    const filePath = path.join(uploadDir, filename);
-    
-    await writeFile(filePath, buffer);
-
-    const url = `/api/file/voices/${filename}`;
-    
-    // Update index.json
-    const indexPath = path.join(uploadDir, 'index.json');
-    let index = [];
-    try {
-      const data = await readFile(indexPath, 'utf-8');
-      index = JSON.parse(data);
-    } catch (e) {
-      // If file doesn't exist or is invalid, start with empty array
-    }
-
-    index.push({
-      url,
-      createdAt: timestamp,
-      title: safeName
+    const publicId = `voices/${timestamp}-${path.parse(safeName).name}`;
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: 'voices', public_id: publicId, resource_type: 'video' },
+        (err, res) => (err ? reject(err) : resolve(res))
+      );
+      uploadStream.end(buffer);
     });
-
-    await writeFile(indexPath, JSON.stringify(index, null, 2));
-
-    return NextResponse.json({ ok: true, url, id: filename });
+    return NextResponse.json({ ok: true, url: result.secure_url, id: result.public_id }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });

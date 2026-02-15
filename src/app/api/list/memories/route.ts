@@ -1,22 +1,38 @@
 import { NextResponse } from 'next/server';
-import { readFile } from 'fs/promises';
-import path from 'path';
+import cloudinary from '@/lib/cloudinary';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const indexPath = path.join(process.cwd(), 'uploads', 'memories', 'index.json');
-    const data = await readFile(indexPath, 'utf-8');
-    let memories = JSON.parse(data);
-    
-    // Deduplicate by URL
-    const uniqueMemories = Array.from(new Map(memories.map((m: any) => [m.url, m])).values());
-    
-    // Sort by newest first
-    uniqueMemories.sort((a: any, b: any) => b.createdAt - a.createdAt);
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.time('memories:list');
+    }
+    // List resources from Cloudinary 'memories' folder
+    const result = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'memories/',
+      max_results: 200,
+      context: false,
+      sort_by: 'created_at',
+      direction: 'desc'
+    });
 
-    return NextResponse.json(uniqueMemories);
+    const memories = result.resources.map((resource: any) => ({
+      id: resource.public_id,
+      url: resource.secure_url,
+      createdAt: new Date(resource.created_at).getTime(),
+      caption: ''
+    }));
+
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.timeEnd('memories:list');
+    }
+    return NextResponse.json(memories, { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } });
   } catch (error) {
-    // If index doesn't exist yet, return empty array
-    return NextResponse.json([]);
+    console.error('List memories error:', error);
+    return NextResponse.json([], { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } });
   }
 }

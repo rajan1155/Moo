@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir, readFile } from 'fs/promises';
+import cloudinary from '@/lib/cloudinary';
 import path from 'path';
 
 export async function POST(request: Request) {
@@ -15,38 +15,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Invalid file type. Must be audio.' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), 'uploads', 'voices');
-    await mkdir(uploadDir, { recursive: true });
-
-    const timestamp = Date.now();
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-    const filename = `${timestamp}-${safeName}`;
-    const filePath = path.join(uploadDir, filename);
-    
-    await writeFile(filePath, buffer);
 
-    const url = `/api/file/voices/${filename}`;
-    
-    // Update index.json
-    const indexPath = path.join(uploadDir, 'index.json');
-    let index = [];
-    try {
-      const data = await readFile(indexPath, 'utf-8');
-      index = JSON.parse(data);
-    } catch (e) {
-      // If file doesn't exist or is invalid, start with empty array
-    }
-
-    index.push({
-      url,
-      createdAt: timestamp,
-      title: safeName
+    // Upload to Cloudinary using a Promise wrapper around upload_stream
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'voices',
+          resource_type: 'video', // Audio is often handled as video in Cloudinary
+          public_id: `${Date.now()}-${path.parse(safeName).name}`,
+          context: `title=${safeName}`, // Store title in context
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
+      uploadStream.end(buffer);
     });
 
-    await writeFile(indexPath, JSON.stringify(index, null, 2));
-
-    return NextResponse.json({ ok: true, url });
+    return NextResponse.json({ ok: true, url: result.secure_url });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });

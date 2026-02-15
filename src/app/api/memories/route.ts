@@ -1,29 +1,31 @@
 import { NextResponse } from 'next/server';
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import cloudinary from '@/lib/cloudinary';
 import path from 'path';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const indexPath = path.join(process.cwd(), 'uploads', 'memories', 'index.json');
-    const data = await readFile(indexPath, 'utf-8');
-    let memories = JSON.parse(data);
-    
-    // Deduplicate by URL
-    const uniqueMemories = Array.from(new Map(memories.map((m: any) => [m.url, m])).values());
-    
-    // Sort by newest first
-    uniqueMemories.sort((a: any, b: any) => b.createdAt - a.createdAt);
-
-    // Add ID to each memory (filename from URL) if not present
-    // Assuming url is like /api/file/memories/filename
-    const memoriesWithId = uniqueMemories.map((m: any) => ({
-      ...m,
-      id: m.url.split('/').pop()
+    const result = await cloudinary.api.resources({
+      type: 'upload',
+      prefix: 'memories/',
+      max_results: 500,
+      sort_by: 'created_at',
+      direction: 'desc',
+      context: true,
+    });
+    const memories = result.resources.map((r: any) => ({
+      id: r.public_id,
+      url: r.secure_url,
+      createdAt: new Date(r.created_at).getTime(),
+      caption: r.context?.custom?.caption || '',
     }));
-
-    return NextResponse.json(memoriesWithId);
+    return NextResponse.json(memories, {
+      headers: { 'Cache-Control': 'no-store' },
+    });
   } catch (error) {
-    return NextResponse.json([]);
+    console.error('Memories GET error:', error);
+    return NextResponse.json([], { headers: { 'Cache-Control': 'no-store' } });
   }
 }
 
@@ -40,38 +42,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'Invalid file type. Must be an image.' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const uploadDir = path.join(process.cwd(), 'uploads', 'memories');
-    await mkdir(uploadDir, { recursive: true });
-
     const timestamp = Date.now();
     const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '');
-    const filename = `${timestamp}-${safeName}`;
-    const filePath = path.join(uploadDir, filename);
-    
-    await writeFile(filePath, buffer);
-
-    const url = `/api/file/memories/${filename}`;
-    
-    // Update index.json
-    const indexPath = path.join(uploadDir, 'index.json');
-    let index = [];
-    try {
-      const data = await readFile(indexPath, 'utf-8');
-      index = JSON.parse(data);
-    } catch (e) {
-      // If file doesn't exist or is invalid, start with empty array
-    }
-
-    index.push({
-      url,
-      createdAt: timestamp,
-      caption: ''
+    const publicId = `memories/${timestamp}-${path.parse(safeName).name}`;
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const result = await new Promise<any>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        { folder: 'memories', public_id: publicId },
+        (err, res) => (err ? reject(err) : resolve(res))
+      );
+      uploadStream.end(buffer);
     });
-
-    await writeFile(indexPath, JSON.stringify(index, null, 2));
-
-    return NextResponse.json({ ok: true, url, id: filename });
+    return NextResponse.json({ ok: true, url: result.secure_url, id: result.public_id }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ ok: false, error: 'Internal server error' }, { status: 500 });
